@@ -79,31 +79,41 @@ module Feedzirra
     # A Hash if multiple URL's are passed. The key will be the URL, and the value the XML.
     def self.fetch_raw(urls, options = {})
       url_queue = [*urls]
-      multi = Curl::Multi.new
-      responses = {}
-      url_queue.each do |url|
-        easy = Curl::Easy.new(url) do |curl|
-          curl.headers["User-Agent"]        = (options[:user_agent] || USER_AGENT)
-          curl.headers["If-Modified-Since"] = options[:if_modified_since].httpdate if options.has_key?(:if_modified_since)
-          curl.headers["If-None-Match"]     = options[:if_none_match] if options.has_key?(:if_none_match)
-          curl.headers["Accept-encoding"]   = 'gzip, deflate' if options.has_key?(:compress)
-          curl.follow_location = true
-          curl.userpwd = options[:http_authentication].join(':') if options.has_key?(:http_authentication)
-          
-          curl.max_redirects = options[:max_redirects] if options[:max_redirects]
-          curl.timeout = options[:timeout] if options[:timeout]
+      
+      if Feedzirra.use_curb?
+        multi = Curl::Multi.new
+        responses = {}
+        url_queue.each do |url|
+          easy = Curl::Easy.new(url) do |curl|
+            curl.headers["User-Agent"]        = (options[:user_agent] || USER_AGENT)
+            curl.headers["If-Modified-Since"] = options[:if_modified_since].httpdate if options.has_key?(:if_modified_since)
+            curl.headers["If-None-Match"]     = options[:if_none_match] if options.has_key?(:if_none_match)
+            curl.headers["Accept-encoding"]   = 'gzip, deflate' if options.has_key?(:compress)
+            curl.follow_location = true
+            curl.userpwd = options[:http_authentication].join(':') if options.has_key?(:http_authentication)
 
-          curl.on_success do |c|
-            responses[url] = decode_content(c)
+            curl.max_redirects = options[:max_redirects] if options[:max_redirects]
+            curl.timeout = options[:timeout] if options[:timeout]
+
+            curl.on_success do |c|
+              responses[url] = decode_content(c)
+            end
+            curl.on_failure do |c, err|
+              responses[url] = c.response_code
+            end
           end
-          curl.on_failure do |c, err|
-            responses[url] = c.response_code
-          end
+          multi.add(easy)
         end
-        multi.add(easy)
+
+        multi.perform
+      else
+        responses = {}
+        url_queue.each do |url|
+          res = fetch_url(url)
+          responses[url] = decode_content(res.body)
+        end
       end
 
-      multi.perform
       urls.is_a?(String) ? responses.values.first : responses
     end
 
@@ -123,17 +133,48 @@ module Feedzirra
     # A Hash if multiple URL's are passed. The key will be the URL, and the value the Feed object.
     def self.fetch_and_parse(urls, options = {})
       url_queue = [*urls]
-      multi = Curl::Multi.new
-      responses = {}
       
-      # I broke these down so I would only try to do 30 simultaneously because
-      # I was getting weird errors when doing a lot. As one finishes it pops another off the queue.
-      url_queue.slice!(0, 30).each do |url|
-        add_url_to_multi(multi, url, url_queue, responses, options)
+      if Feedzirra.use_curb?
+        multi = Curl::Multi.new
+        responses = {}
+
+        # I broke these down so I would only try to do 30 simultaneously because
+        # I was getting weird errors when doing a lot. As one finishes it pops another off the queue.
+        url_queue.slice!(0, 30).each do |url|
+          add_url_to_multi(multi, url, url_queue, responses, options)
+        end
+
+        multi.perform
+      else
+        responses = {}
+        url_queue.each do |url|
+          res = fetch_url(url)
+          responses[url] = try_parse(url, res.code, res, res.body)
+        end
       end
- 
-      multi.perform
+      
       return urls.is_a?(String) ? responses.values.first : responses
+    end
+    
+    # Fallback method for using net/http instead of curb on JRuby
+    def self.fetch_url(url, limit=10, options={})
+      raise RuntimeError, "HTTP redirect too deep" if limit == 0
+      
+      uri = URI.parse(url)
+      req = Net::HTTP::Get.new(uri.path)
+      req['if-modified-since'] = options[:if_modified_since] if options[:if_modified_since]
+      req['if-none-match'] = options[:if_none_match] if options[:if_none_match]
+      res = Net::HTTP.start(uri.host, uri.port) do |http|
+        http.request(req)
+      end
+      
+      # Handle HTTP redirect
+      case res
+      when Net::HTTPSuccess then res
+      when Net::HTTPRedirection then fetch_url(res['location'], limit - 1)
+      else
+        res.error!
+      end
     end
 
     # Decodes the XML document if it was compressed.

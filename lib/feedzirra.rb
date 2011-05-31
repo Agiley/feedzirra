@@ -1,7 +1,24 @@
 $LOAD_PATH.unshift(File.dirname(__FILE__)) unless $LOAD_PATH.include?(File.dirname(__FILE__))
 
+module Feedzirra
+  def self.use_curb=(curb)
+    @use_curb = curb
+  end
+  def self.use_curb?
+    @use_curb
+  end
+  VERSION = "0.0.24"
+end
+
+if (defined?(JRUBY_VERSION))
+  require 'net/http'
+  Feedzirra.use_curb = false
+else
+  require 'curb'
+  Feedzirra.use_curb = true
+end
+
 require 'zlib'
-require 'curb'
 require 'sax-machine'
 require 'loofah'
 require 'uri'
@@ -35,7 +52,3 @@ require 'feedzirra/parser/rss'
 require 'feedzirra/parser/itunes_rss'
 require 'feedzirra/parser/atom'
 require 'feedzirra/parser/atom_feed_burner'
-
-module Feedzirra
-  VERSION = "0.0.24"
-end
