@@ -156,7 +156,6 @@ module Feedzirra
       return urls.is_a?(String) ? responses.values.first : responses
     end
     
-    # Fallback method for using net/http instead of curb on JRuby
     def self.fetch_url(url, limit=10, options={})
       raise RuntimeError, "HTTP redirect too deep" if limit == 0
       
@@ -170,10 +169,40 @@ module Feedzirra
       
       # Handle HTTP redirect
       case res
-      when Net::HTTPSuccess then res
-      when Net::HTTPRedirection then fetch_url(res['location'], limit - 1)
+        when Net::HTTPSuccess then res
+        when Net::HTTPRedirection then fetch_url(res['location'], limit - 1)
+        else
+          res.error!
+      end
+    end
+    
+    def self.try_parse(url, response_code, headers, body)
+      xml = decode_content2(headers, body)
+      klass = determine_feed_parser_for_xml(xml)
+      
+      if klass
+        begin
+          feed = klass.parse(xml)
+          feed.feed_url = url
+          feed.etag = headers['etag']
+          feed.last_modified = headers['last-modified']
+          feed
+        rescue Exception => e
+          "Error: Exception while parsing #{url}: #{e.message}"
+        end
       else
-        res.error!
+        "Error: Cannot determine feed parser for #{url}"
+      end
+    end
+    
+    # Decodes the body if the Content-encoding is either gzip or deflate.
+    def self.decode_content2(headers, body)
+      if headers['content-encoding'] == 'gzip'
+        decompress(body)
+      elsif headers['content-encoding'] == 'deflate'
+        inflate(body)
+      else
+        body
       end
     end
 

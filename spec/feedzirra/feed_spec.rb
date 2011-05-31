@@ -509,13 +509,38 @@ describe Feedzirra::Feed do
       end
     end
     
-    if (Feedzirra.use_curb?)
-      describe "#fetch_and_parse" do
-        it 'should initiate the fetching and parsing using multicurl'
-        it "should pass any request options through to add_url_to_multi"
-        it 'should slice the feeds into groups of thirty for processing'
-        it "should return a feed object if a single feed is passed in"
-        it "should return an return an array of feed objects if multiple feeds are passed in"
+    describe "#fetch_and_parse" do
+      if (Feedzirra.use_curb?)
+        describe "with curl" do
+          it 'should initiate the fetching and parsing using multicurl'
+          it "should pass any request options through to add_url_to_multi"
+          it 'should slice the feeds into groups of thirty for processing'
+          it "should return a feed object if a single feed is passed in"
+          it "should return an return an array of feed objects if multiple feeds are passed in"
+        end
+      else
+        describe "without curl" do
+          before(:each) do
+            Feedzirra.should_receive(:use_curb?).and_return(false)
+          end
+          it 'should initiate the fetching and parsing using Net::HTTP' do
+            url = 'http://engadget.com/rss.xml'
+            responses = Feedzirra::Feed.fetch_and_parse(url)
+            responses.should_not == nil
+          end
+          it "should return a feed object if a single feed is passed in" do
+            url = 'http://engadget.com/rss.xml'
+            responses = Feedzirra::Feed.fetch_and_parse(url)
+            responses.title.should == 'Engadget'
+            responses.entries.length.should == 40
+          end
+          it "should return an return an hash of feed objects if multiple feeds are passed in" do
+            responses = Feedzirra::Feed.fetch_and_parse(
+              ['http://engadget.com/rss.xml', 'http://gizmodo.com/index.xml']
+            )
+            responses.length.should == 2
+          end
+        end
       end
     end
 
