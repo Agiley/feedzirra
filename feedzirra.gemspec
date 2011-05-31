@@ -55,7 +55,7 @@ Gem::Specification.new do |s|
       s.add_runtime_dependency(%q<curb>, [">= 0.2.3"]) if (!defined?(JRUBY_VERSION))
       s.add_runtime_dependency(%q<builder>, [">= 2.1.2"])
       s.add_runtime_dependency(%q<activesupport>, [">=2.3.8"])
-      s.add_runtime_dependency(%q<i18n>, [">=0.6.0"])
+      s.add_runtime_dependency(%q<i18n>, [">= 0.0.0"])
       s.add_runtime_dependency(%q<loofah>, [">= 0.3.1"])
     else
       s.add_dependency(%q<nokogiri>, ["> 0.0.0"])
@@ -63,7 +63,7 @@ Gem::Specification.new do |s|
       s.add_dependency(%q<curb>, [">= 0.2.3"]) if (!defined?(JRUBY_VERSION))
       s.add_dependency(%q<builder>, [">= 2.1.2"])
       s.add_dependency(%q<activesupport>, [">=2.3.8"])
-      s.add_dependency(%q<i18n>, [">=0.6.0"])
+      s.add_dependency(%q<i18n>, [">=0.0.0"])
       s.add_dependency(%q<loofah>, [">= 0.3.1"])
     end
   else
@@ -72,7 +72,7 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<curb>, [">= 0.2.3"]) if (!defined?(JRUBY_VERSION))
     s.add_dependency(%q<builder>, [">= 2.1.2"])
     s.add_dependency(%q<activesupport>, [">=2.3.8"])
-    s.add_dependency(%q<i18n>, [">=0.6.0"])
+    s.add_dependency(%q<i18n>, [">=0.0.0"])
     s.add_dependency(%q<loofah>, [">= 0.3.1"])
   end
 
